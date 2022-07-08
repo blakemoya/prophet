@@ -98,6 +98,8 @@ data {
   int trend_indicator;  // 0 for linear, 1 for logistic, 2 for flat
   vector[K] s_a;        // Indicator of additive features
   vector[K] s_m;        // Indicator of multiplicative features
+  real k_ps;            // Prior scale for k
+  real m_ps;            // Prior scale for m
 }
 
 transformed data {
@@ -127,8 +129,8 @@ transformed parameters {
 
 model {
   //priors
-  k ~ normal(0, 5);
-  m ~ normal(0, 5);
+  k ~ normal(0, k_ps);
+  m ~ normal(0, m_ps);
   delta ~ double_exponential(0, tau);
   sigma_obs ~ normal(0, 0.5);
   beta ~ normal(0, sigmas);

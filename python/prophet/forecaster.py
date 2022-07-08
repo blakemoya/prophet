@@ -60,6 +60,8 @@ class Prophet(object):
     changepoint_prior_scale: Parameter modulating the flexibility of the
         automatic changepoint selection. Large values will allow many
         changepoints, small values will allow few changepoints.
+    k_prior_scale: Parameter modulating baseline trend.
+    m_prior_scale: Parameter modulating trend strength.
     mcmc_samples: Integer, if greater than 0, will do full Bayesian inference
         with the specified number of MCMC samples. If 0, will do MAP
         estimation.
@@ -89,6 +91,8 @@ class Prophet(object):
             seasonality_prior_scale=10.0,
             holidays_prior_scale=10.0,
             changepoint_prior_scale=0.05,
+            k_prior_scale=5,
+            m_prior_scale=5,
             mcmc_samples=0,
             interval_width=0.80,
             uncertainty_samples=1000,
@@ -115,6 +119,8 @@ class Prophet(object):
         self.seasonality_prior_scale = float(seasonality_prior_scale)
         self.changepoint_prior_scale = float(changepoint_prior_scale)
         self.holidays_prior_scale = float(holidays_prior_scale)
+        self.k_prior_scale = float(k_prior_scale)
+        self.m_prior_scale = float(m_prior_scale)
 
         self.mcmc_samples = mcmc_samples
         self.interval_width = interval_width
@@ -1139,6 +1145,8 @@ class Prophet(object):
             'trend_indicator': trend_indicator[self.growth],
             's_a': component_cols['additive_terms'],
             's_m': component_cols['multiplicative_terms'],
+            'kps': self.k_prior_scale,
+            'mps': self.m_prior_scale
         }
 
         if self.growth == 'linear':
