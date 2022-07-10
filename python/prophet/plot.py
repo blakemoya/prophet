@@ -463,7 +463,7 @@ def add_changepoints_to_plot(
     """
     artists = []
     if trend:
-        artists.append(ax.plot(fcst['ds'], fcst['trend'], c=cp_color))
+        artists.append(ax.plot(fcst['ds'], m.ilink(fcst['trend']), c=cp_color))
     signif_changepoints = m.changepoints[
         np.abs(np.nanmean(m.params['delta'], axis=0)) >= threshold
     ] if len(m.changepoints) > 0 else []
@@ -651,7 +651,7 @@ def plot_plotly(m, fcst, uncertainty=True, plot_cap=True, trend=False, changepoi
         data.append(go.Scatter(
             name='Trend',
             x=fcst['ds'],
-            y=fcst['trend'],
+            y=m.ilink(fcst['trend']),
             mode='lines',
             line=dict(color=trend_color, width=line_width),
         ))
