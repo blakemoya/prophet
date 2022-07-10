@@ -90,12 +90,14 @@ data {
   vector[T] t;          // Time
   vector[T] cap;        // Capacities for logistic trend
   vector[T] y;          // Time series
+  int<lower=0> y_int[T];         // Time series as integer
   int S;                // Number of changepoints
   vector[S] t_change;   // Times of trend changepoints
   matrix[T,K] X;        // Regressors
   vector[K] sigmas;     // Scale on seasonality prior
   real<lower=0> tau;    // Scale on changepoints prior
   int trend_indicator;  // 0 for linear, 1 for logistic, 2 for flat
+  int like_indicator;   // 0 for normal, 1 for negative_binomial
   vector[K] s_a;        // Indicator of additive features
   vector[K] s_m;        // Indicator of multiplicative features
   real k_ps;            // Prior scale for k
@@ -136,10 +138,21 @@ model {
   beta ~ normal(0, sigmas);
 
   // Likelihood
-  y ~ normal_id_glm(
-    X_sa,
-    trend .* (1 + X_sm * beta),
-    beta,
-    sigma_obs
-  );
+  if (like_indicator == 0) {
+    print("normal");
+    y ~ normal_id_glm(
+      X_sa,
+      trend .* (1 + X_sm * beta),
+      beta,
+      sigma_obs
+    );
+  } else if (like_indicator == 1) {
+    print("negative binomial");
+    y_int ~ neg_binomial_2_log_glm(
+      X_sa,
+      trend .* (1 + X_sm * beta),
+      beta,
+      sigma_obs
+    );
+  }
 }
