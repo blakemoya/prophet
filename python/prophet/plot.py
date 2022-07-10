@@ -651,7 +651,7 @@ def plot_plotly(m, fcst, uncertainty=True, plot_cap=True, trend=False, changepoi
         data.append(go.Scatter(
             name='Trend',
             x=fcst['ds'],
-            y=fcst['trend'],
+            y=m.ilink(fcst['trend']),
             mode='lines',
             line=dict(color=trend_color, width=line_width),
         ))
