@@ -139,7 +139,6 @@ model {
 
   // Likelihood
   if (like_indicator == 0) {
-    print("normal");
     y ~ normal_id_glm(
       X_sa,
       trend .* (1 + X_sm * beta),
@@ -147,7 +146,6 @@ model {
       sigma_obs
     );
   } else if (like_indicator == 1) {
-    print("negative binomial");
     y_int ~ neg_binomial_2_log_glm(
       X_sa,
       trend .* (1 + X_sm * beta),

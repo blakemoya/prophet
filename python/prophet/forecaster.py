@@ -30,6 +30,8 @@ class Prophet(object):
     ----------
     growth: String 'linear', 'logistic' or 'flat' to specify a linear, logistic or
         flat trend.
+    likelihood: String 'normal' or 'negative_binomial' to specify a normal or
+        negative binomial likelihood
     changepoints: List of dates at which to include potential changepoints. If
         not specified, potential changepoints are selected automatically.
     n_changepoints: Number of potential changepoints to include. Not used
@@ -368,7 +370,11 @@ class Prophet(object):
         else:
             floor = 0.
         if self.likelihood == 'normal':
-            self.y_scale = float((df['y'] - floor).abs().max())
+            # Catch KeyError when using `sample_prior`
+            try:
+                self.y_scale = float((df['y'] - floor).abs().max())
+            except KeyError:
+                self.y_scale = 0
         elif self.likelihood == 'negative_binomial':
             self.y_scale = 1.0
         if self.y_scale == 0:
@@ -1672,3 +1678,115 @@ class Prophet(object):
             weekly_start=weekly_start, yearly_start=yearly_start,
             figsize=figsize
         )
+
+    def sample_prior(self, df):
+        """
+        Sample a time series from the prior.
+
+        Parameters
+        ----------
+        df: pd.DataFrame with a column named ds (date type)
+            on which to sample a time series.
+        """
+        if ('ds' not in df):
+            raise ValueError(
+                'Dataframe must have column "ds" with the dates.'
+            )
+        history = df[df['ds'].notnull()].copy()
+        if history.shape[0] < 2:
+            raise ValueError('Dataframe has less than 2 non-NaN rows.')
+        self.history_dates = pd.to_datetime(pd.Series(df['ds'].unique(), name='ds')).sort_values()
+
+        history = self.setup_dataframe(history, initialize_scales=True)
+        self.history = history
+        self.set_auto_seasonalities()
+        seasonal_features, prior_scales, component_cols, modes = (
+            self.make_all_seasonality_features(self.history))
+
+        init_cp = self.changepoints
+        init_cpt = self.changepoints_t
+        init_ncp = self.n_changepoints
+        self.set_changepoints()
+
+        trend_indicator = {'linear': 0, 'logistic': 1, 'flat': 2}
+        like_indicator = {'normal': 0, 'negative_binomial': 1}
+
+        dat = {
+            'T': history.shape[0],
+            'K': seasonal_features.shape[1],
+            'S': len(self.changepoints_t),
+            't': history['t'],
+            't_change': self.changepoints_t,
+            'X': seasonal_features,
+            'sigmas': prior_scales,
+            'tau': self.changepoint_prior_scale,
+            'trend_indicator': trend_indicator[self.growth],
+            'like_indicator': like_indicator[self.likelihood],
+            's_a': component_cols['additive_terms'],
+            's_m': component_cols['multiplicative_terms'],
+            'k_ps': self.k_prior_scale,
+            'm_ps': self.m_prior_scale
+        }
+
+        if self.growth == 'linear':
+            dat['cap'] = np.zeros(self.history.shape[0])
+        elif self.growth == 'flat':
+            dat['cap'] = np.zeros(self.history.shape[0])
+        else:
+            dat['cap'] = history['cap_scaled']
+
+        params = {
+            'k': np.random.normal(0, self.k_prior_scale),
+            'm': np.random.normal(0, self.m_prior_scale),
+            'delta': np.random.laplace(0, self.changepoint_prior_scale, size=dat['S']),
+            'beta': np.random.normal(0, dat['sigmas'], size=dat['K']),
+            'sigma_obs': np.absolute(np.random.normal(0, 0.5)),
+        }
+
+        # Replicate transformation from stan for X_sa, X_sm, and trend
+        A = np.zeros((dat['T'], dat['S']))
+        a_row = np.zeros(dat['S'])
+        cp_idx = 0
+        for i in range(0, dat['T']):
+            while ((cp_idx < dat['S']) and (dat['t'][i] >= dat['t_change'][cp_idx])):
+                a_row[cp_idx] = 1
+                cp_idx += 1
+            A[i, :] = a_row
+        
+        X_sa = np.multiply(dat['X'], dat['s_a'].to_numpy())
+        X_sm = np.multiply(dat['X'], dat['s_m'].to_numpy())
+
+        if self.growth == 'linear':
+            trend = (params['k'] + np.multiply(np.matmul(A, params['delta']), dat['t'])) + (params['m'] + A.dot(-dat['t_change'] * params['delta']))
+        if self.growth == 'flat':
+            trend = np.repeat(params['m'], dat['T'])
+        if self.growth == 'logistic':
+            print('Logistic prior generation currently unsupported.')
+            raise
+
+        if len(self.changepoints) == 0:
+            params['k'] = (params['k'] + params['delta'].reshape(-1))
+            params['delta'] = (np.zeros(params['delta'].shape).reshape((-1, 1)))
+
+        alpha = trend * (1 + np.matmul(X_sm, params['beta']))
+        mu = self.ilink(alpha + np.matmul(X_sa, params['beta']))
+        if self.likelihood == 'normal':
+            var = params['sigma_obs']
+        elif self.likelihood == 'negative_binomial':
+            var = mu + params['sigma_obs'] * np.square(mu)
+
+        # Forget internal changes
+        self.history = None
+        self.changepoints = init_cp
+        self.changepoints_t = init_cpt
+        self.n_changepoints = init_ncp
+
+        df['trend'] = trend
+        df['yhat'] = mu
+        if self.likelihood == 'normal':
+            df['y'] = np.random.normal(mu, var, size=len(mu))
+        elif self.likelihood == 'negative_binomial':
+            df['y'] = np.random.negative_binomial(np.square(mu) / (var - mu), 
+                                                  mu / var, 
+                                                  size=len(mu))
+        return (df, dat, params)
