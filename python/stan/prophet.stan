@@ -133,8 +133,8 @@ model {
   //priors
   k ~ normal(0, k_ps);
   m ~ normal(0, m_ps);
-  delta ~ double_exponential(0, tau);
-  sigma_obs ~ normal(0, 0.5);
+  delta ~ cauchy(0, tau);
+  sigma_obs ~ gamma(2, 2);
   beta ~ normal(0, sigmas);
 
   // Likelihood
@@ -150,7 +150,7 @@ model {
       X_sa,
       trend .* (1 + X_sm * beta),
       beta,
-      sigma_obs
+      1 / sigma_obs
     );
   }
 }

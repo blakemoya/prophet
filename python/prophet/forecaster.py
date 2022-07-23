@@ -1165,7 +1165,7 @@ class Prophet(object):
             'K': seasonal_features.shape[1],
             'S': len(self.changepoints_t),
             'y': history['y_scaled'],
-            'y_int': history['y_scaled'],
+            'y_int': abs(history['y_scaled']), # Handle with something bettwe than abs...
             't': history['t'],
             't_change': self.changepoints_t,
             'X': seasonal_features,
@@ -1183,8 +1183,8 @@ class Prophet(object):
             dat['cap'] = np.zeros(self.history.shape[0])
             kinit = self.linear_growth_init(history, self.link)
         elif self.growth == 'flat':
-            dat['cap'] = np.zeros(self.history.shape[0], self.link)
-            kinit = self.flat_growth_init(history)
+            dat['cap'] = np.zeros(self.history.shape[0])
+            kinit = self.flat_growth_init(history, self.link)
         else:
             dat['cap'] = history['cap_scaled']
             kinit = self.logistic_growth_init(history)
@@ -1521,7 +1521,7 @@ class Prophet(object):
             })
         elif self.likelihood == 'negative_binomial':
             nb_mu = self.ilink(trend * (1 + Xb_m) + Xb_a)
-            nb_phi = self.params['sigma_obs'][iteration]
+            nb_phi = 1 / self.params['sigma_obs'][iteration]
             return pd.DataFrame({
                 'yhat': np.random.negative_binomial(nb_phi, nb_phi / (nb_mu + nb_phi)),
                 'trend': trend

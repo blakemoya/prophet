@@ -19,7 +19,7 @@ from prophet import __version__
 
 
 SIMPLE_ATTRIBUTES = [
-    'growth', 'n_changepoints', 'specified_changepoints', 'changepoint_range',
+    'growth', 'likelihood', 'n_changepoints', 'specified_changepoints', 'changepoint_range',
     'yearly_seasonality', 'weekly_seasonality', 'daily_seasonality',
     'seasonality_mode', 'seasonality_prior_scale', 'changepoint_prior_scale',
     'holidays_prior_scale', 'mcmc_samples', 'interval_width', 'uncertainty_samples',
@@ -138,7 +138,7 @@ def model_from_dict(model_dict):
     -------
     Prophet model.
     """
-    model = Prophet()  # We will overwrite all attributes set in init anyway
+    model = Prophet(likelihood=model_dict['likelihood'])  # We will overwrite all attributes set in init anyway
     # Simple types
     for attribute in SIMPLE_ATTRIBUTES:
         setattr(model, attribute, model_dict[attribute])
